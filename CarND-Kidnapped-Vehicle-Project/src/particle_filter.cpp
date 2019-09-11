@@ -31,7 +31,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
    * NOTE: Consult particle_filter.h for more information about this method 
    *   (and others in this file).
    */
-  unsigned int num_particles = 20;  // Set the number of particles
+  unsigned int num_particles = 100;  // Set the number of particles
   
   // Gaussian distribution
   std::normal_distribution<double> dist_x(x, std[0]);
@@ -46,6 +46,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
     p.theta = dist_theta(gen);
     p.weight = 1.0;
     particles.push_back(p);
+    weights.push_back(1.0);
   }
 
   is_initialized = true;
@@ -67,10 +68,12 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
   
   for(unsigned int i = 0; i < num_particles; i++) {
     
-    if (fabs(yaw_rate) > 0.001) {
+    if (fabs(yaw_rate) > 0.00001) {
       // Add measurements to particles (for nozero yaw rate, i.e., turns)
-      particles[i].x += velocity * (sin(particles[i].theta) + yaw_rate*delta_t - sin(particles[i].theta)) / yaw_rate;
-      particles[i].y += velocity * (-cos(particles[i].theta) + yaw_rate*delta_t - cos(particles[i].theta)) / yaw_rate;
+      particles[i].x += velocity/yaw_rate * (sin(particles[i].theta + yaw_rate*delta_t) - sin(particles[i].theta));
+      particles[i].y += velocity/yaw_rate * (cos(particles[i].theta) - cos(yaw_rate*delta_t - particles[i].theta));
+      //particles[i].x += velocity * (sin(particles[i].theta) + yaw_rate*delta_t - sin(particles[i].theta)) / yaw_rate;
+      //particles[i].y += velocity * (-cos(particles[i].theta) + yaw_rate*delta_t - cos(particles[i].theta)) / yaw_rate;
       particles[i].theta += yaw_rate * delta_t;
       
     } else {
@@ -149,7 +152,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   vector<LandmarkObs> predictions;
   for(unsigned int i = 0; i < map_landmarks.landmark_list.size(); i++) {
     Map::single_landmark_s landmark = map_landmarks.landmark_list[i];
-    double distance = dist(particles[particle].x, particles[particle].x, landmark.x_f, landmark.y_f);
+    double distance = dist(particles[particle].x, particles[particle].y, landmark.x_f, landmark.y_f);
     if(distance < sensor_range) {
       predictions.push_back(LandmarkObs{landmark.id_i, landmark.x_f, landmark.y_f});
     }
@@ -170,7 +173,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
         double sig_x = std_landmark[0] * std_landmark[0];
         double sig_y = std_landmark[1] * std_landmark[1];
 
-        double gauss_norm = 1 / (2 * M_PI * sig_x * sig_y);
+        double gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
         double exponent = dx_sq/(2*sig_x) + dy_sq/(2*sig_y);
 
         weight = gauss_norm * exp(-exponent);
